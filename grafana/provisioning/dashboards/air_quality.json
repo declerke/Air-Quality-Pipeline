@@ -1,0 +1,468 @@
+{
+  "uid": "air-quality-main",
+  "title": "Air Quality Pipeline — Kenya & Global",
+  "description": "Near-real-time air quality monitoring. Data sourced from OpenAQ v3.",
+  "tags": ["air-quality", "kenya", "openaq", "pm25"],
+  "timezone": "Africa/Nairobi",
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "version": 1,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "templating": {
+    "list": [
+      {
+        "name": "country",
+        "type": "query",
+        "label": "Country",
+        "datasource": "AirQualityDB",
+        "query": "SELECT DISTINCT country FROM raw.measurements WHERE country IS NOT NULL ORDER BY country",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": null,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "city",
+        "type": "query",
+        "label": "City",
+        "datasource": "AirQualityDB",
+        "query": "SELECT DISTINCT city FROM raw.measurements WHERE (country IN (${country:sqlstring}) OR '$country' = '.*') AND city IS NOT NULL AND city != '' ORDER BY city",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "All",
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "parameter",
+        "type": "query",
+        "label": "Pollutant",
+        "datasource": "AirQualityDB",
+        "query": "SELECT DISTINCT parameter FROM raw.measurements ORDER BY parameter",
+        "refresh": 2,
+        "multi": false,
+        "includeAll": false,
+        "current": { "text": "pm25", "value": "pm25" }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Quality Check Failures",
+        "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+        "enable": true,
+        "hide": false,
+        "iconColor": "red",
+        "rawQuery": true,
+        "query": "SELECT EXTRACT(EPOCH FROM checked_at) * 1000 AS time, check_name AS text, details::text AS tags FROM processed.data_quality_log WHERE status = 'failed' AND $__timeFilter(checked_at)"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pipeline Status — Latest Ingest",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 10 }
+            ]
+          },
+          "unit": "short",
+          "displayName": "Records (Last Hour)"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM raw.measurements WHERE ingested_at >= NOW() - INTERVAL '1 hour'",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Total Stations Reporting",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 5 }
+            ]
+          },
+          "unit": "short",
+          "displayName": "Active Stations (24h)"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT location_id) AS value FROM raw.measurements WHERE measured_at >= NOW() - INTERVAL '24 hours'",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Nairobi Current PM2.5",
+      "type": "gauge",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 300,
+          "unit": "µg/m³",
+          "displayName": "PM2.5 µg/m³",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 12.1 },
+              { "color": "orange", "value": 35.5 },
+              { "color": "red", "value": 55.5 }
+            ]
+          }
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": true, "showThresholdMarkers": true },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT AVG(value) AS value FROM analytics.latest_readings WHERE city ILIKE '%nairobi%' AND parameter = 'pm25'",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Quality Check Status",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "FAILING", "color": "red" }, "1": { "text": "PASSING", "color": "green" } } }
+          ],
+          "displayName": "Last Quality Run"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT CASE WHEN status = 'passed' THEN 1 ELSE 0 END AS value FROM processed.data_quality_log WHERE check_name = 'freshness_check' ORDER BY checked_at DESC LIMIT 1",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Threshold Alerts Active",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          },
+          "unit": "short",
+          "displayName": "Threshold Breaches"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM analytics.threshold_breaches",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Data Freshness (Hours Since Last Reading)",
+      "type": "stat",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "h",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 3 }
+            ]
+          },
+          "displayName": "Hours Since Last Reading"
+        }
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT EXTRACT(EPOCH FROM (NOW() - MAX(measured_at))) / 3600.0 AS value FROM raw.measurements",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Pollutant Trend — $parameter — Nairobi (Last 7 Days)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µg/m³",
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "spanNulls": true }
+        }
+      },
+      "options": {
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT hour_bucket AS time, location_name AS metric, ROUND(avg_value::numeric, 2) AS value FROM processed.hourly_averages WHERE parameter = '$parameter' AND city ILIKE '%nairobi%' AND $__timeFilter(hour_bucket) ORDER BY time ASC",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Global City Comparison — Daily Avg $parameter",
+      "type": "barchart",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µg/m³",
+          "custom": { "lineWidth": 1 }
+        }
+      },
+      "options": {
+        "orientation": "auto",
+        "xTickLabelRotation": -45,
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "tooltip": { "mode": "multi" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT day_bucket AS time, city AS metric, ROUND(avg_value::numeric, 2) AS value FROM analytics.city_daily_summary WHERE parameter = '$parameter' AND $__timeFilter(day_bucket) ORDER BY time ASC, city",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "Current Sensor Readings — Map",
+      "type": "geomap",
+      "gridPos": { "x": 0, "y": 21, "w": 14, "h": 10 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 12.1 },
+              { "color": "orange", "value": 35.5 },
+              { "color": "red", "value": 55.5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "view": { "id": "coords", "lat": 1.2, "lon": 36.8, "zoom": 4 },
+        "controls": { "showZoom": true, "mouseWheelZoom": true },
+        "layers": [
+          {
+            "type": "markers",
+            "name": "Sensor Readings",
+            "config": {
+              "style": { "size": { "fixed": 10 }, "color": { "field": "value", "fixed": "dark-green" }, "opacity": 0.8, "symbol": { "fixed": "img/icons/marker/circle.svg" } },
+              "showTooltip": true
+            },
+            "location": { "mode": "coords", "latitude": "latitude", "longitude": "longitude" }
+          }
+        ]
+      },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT location_name, city, country, latitude, longitude, ROUND(value::numeric, 2) AS value, parameter, aqi_category FROM analytics.latest_readings WHERE parameter = '$parameter' AND latitude IS NOT NULL AND longitude IS NOT NULL",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "title": "Threshold Breaches — Active Alerts",
+      "type": "table",
+      "gridPos": { "x": 14, "y": 21, "w": 10, "h": 10 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": { "custom": { "displayMode": "auto", "inspect": false } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "value" },
+            "properties": [
+              { "id": "displayName", "value": "Value (µg/m³)" },
+              {
+                "id": "custom.displayMode",
+                "value": "color-background"
+              },
+              {
+                "id": "color",
+                "value": { "mode": "thresholds" }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "orange", "value": null },
+                    { "color": "red", "value": 55 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Value (µg/m³)" }]
+      },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT location_name, city, country, parameter, ROUND(value::numeric, 2) AS value, TO_CHAR(measured_at AT TIME ZONE 'Africa/Nairobi', 'YYYY-MM-DD HH24:MI') AS measured_at_eat, breach_reason FROM analytics.threshold_breaches ORDER BY value DESC LIMIT 50",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "title": "Daily PM2.5 — Nairobi Heatmap",
+      "type": "heatmap",
+      "gridPos": { "x": 0, "y": 31, "w": 12, "h": 8 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": { "defaults": { "unit": "µg/m³" } },
+      "options": {
+        "calculate": false,
+        "yAxis": { "unit": "µg/m³" },
+        "color": { "scheme": "Oranges", "mode": "scheme" },
+        "tooltip": { "show": true, "yHistogram": false }
+      },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT hour_bucket AS time, ROUND(avg_value::numeric, 2) AS value FROM processed.hourly_averages WHERE parameter = 'pm25' AND city ILIKE '%nairobi%' AND $__timeFilter(hour_bucket) ORDER BY time",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "title": "AQI Category Distribution — All Cities",
+      "type": "piechart",
+      "gridPos": { "x": 12, "y": 31, "w": 12, "h": 8 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": {
+        "pieType": "donut",
+        "legend": { "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT aqi_category AS metric, COUNT(*) AS value FROM analytics.latest_readings WHERE aqi_category IS NOT NULL GROUP BY aqi_category ORDER BY value DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 40,
+      "title": "Data Quality Check History",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 39, "w": 24, "h": 7 },
+      "datasource": { "type": "postgres", "datasource": "AirQualityDB" },
+      "fieldConfig": {
+        "defaults": { "custom": { "displayMode": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "status" },
+            "properties": [
+              { "id": "custom.displayMode", "value": "color-background" },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "passed": { "color": "green", "index": 0 }, "failed": { "color": "red", "index": 1 }, "warning": { "color": "orange", "index": 2 } } }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "rawQuery": true,
+          "rawSql": "SELECT TO_CHAR(checked_at AT TIME ZONE 'Africa/Nairobi', 'YYYY-MM-DD HH24:MI') AS checked_at_eat, dag_id, check_name, status, records_checked, records_failed FROM processed.data_quality_log WHERE $__timeFilter(checked_at) ORDER BY checked_at DESC LIMIT 100",
+          "format": "table"
+        }
+      ]
+    }
+  ]
+}

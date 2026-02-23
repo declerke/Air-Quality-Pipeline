@@ -1,0 +1,19 @@
+apiVersion: 1
+datasources:
+  - name: AirQualityDB
+    type: postgres
+    access: proxy
+    url: postgres-data:5432
+    database: airquality
+    user: aquser
+    secureJsonData:
+      password: aqpassword
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: true
+    editable: true
