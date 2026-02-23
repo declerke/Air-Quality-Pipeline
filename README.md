@@ -76,7 +76,7 @@ air-quality-pipeline/
 
 ### 1. Environment Setup
 ```bash
-git clone [https://github.com/YourUsername/air-quality-pipeline.git](https://github.com/YourUsername/air-quality-pipeline.git)
+git clone [https://github.com/declerke/air-quality-pipeline.git](https://github.com/declerke/air-quality-pipeline.git)
 cd air-quality-pipeline
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
