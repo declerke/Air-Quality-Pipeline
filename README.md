@@ -18,14 +18,14 @@ Urban air pollution is a critical health metric, yet data is often fragmented or
 
 ```text
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
-│  OpenAQ API v3  │      │   Apache Airflow│      │   PostgreSQL    │
+│  OpenAQ API v3  │      │  Apache Airflow │      │   PostgreSQL    │
 │ (Global Sensors)│ ───▶│ (Orchestration) │ ───▶ │ (Analytic Hub)  │
 └─────────────────┘      └─────────────────┘      └─────────────────┘
                                  │                       │
-                        ┌─────────────────┐     ┌─────────────────┐
-                        │ Partitioned Lake│     │    Grafana      │
-                        │ (Local Parquet) │     │  (Observability)│
-                        └─────────────────┘     └─────────────────┘
+                         ┌─────────────────┐      ┌─────────────────┐
+                         │ Partitioned Lake│      │    Grafana      │
+                         │ (Local Parquet) │      │  (Observability)│
+                         └─────────────────┘      └─────────────────┘
 ```
 
 ---
